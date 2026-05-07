@@ -1,8 +1,9 @@
 import { vi, describe, beforeEach, it, expect } from 'vitest'
 // TODO: We should only mock out clone and push but keep the rest of the options
 // the same. This will allow us to test the actual git commands.
+const cloneSpy = vi.fn()
 const stubbedGit = {
-  clone: vi.fn(),
+  clone: cloneSpy,
   push: vi.fn(),
   addRemote: vi.fn(),
   fetch: vi.fn(),
@@ -47,6 +48,7 @@ const fakeForkRepo = {
   status: 200,
   data: {
     clone_url: 'https://github.com/github-test/fork-test.git',
+    default_branch: 'main',
     login: 'fork-test',
     owner: {
       login: 'github-test',
@@ -358,5 +360,84 @@ describe('Repos router', () => {
           /Mirror name cannot exceed 100 characters/,
         )
       })
+  })
+
+  it('should clone with --single-branch, --branch, and --no-tags by default', async () => {
+    const caller = t.createCallerFactory(reposRouter)(createTestContext())
+
+    vi.spyOn(config, 'getConfig').mockResolvedValue({
+      publicOrg: 'github',
+      privateOrg: 'github-test',
+    })
+
+    om.mockFunctions.rest.apps.getOrgInstallation.mockResolvedValue(
+      fakeOrgInstallation,
+    )
+    om.mockFunctions.rest.orgs.get.mockResolvedValue(fakeOrg)
+    om.mockFunctions.rest.repos.get.mockResolvedValueOnce(repoNotFound)
+    om.mockFunctions.rest.repos.get.mockResolvedValueOnce(fakeForkRepo)
+    om.mockFunctions.rest.orgs.getAllCustomProperties.mockResolvedValue(
+      fakeOrgCustomProperties,
+    )
+    om.mockFunctions.rest.orgs.createOrUpdateCustomProperty.mockResolvedValue(
+      fakeOrgCustomProperties,
+    )
+    om.mockFunctions.rest.repos.createInOrg.mockResolvedValue(fakeMirrorRepo)
+
+    await caller.createMirror({
+      forkId: 'test',
+      orgId: 'test',
+      forkRepoName: 'fork-test',
+      forkRepoOwner: 'github',
+      newBranchName: 'test',
+      newRepoName: 'test',
+    })
+
+    expect(cloneSpy).toHaveBeenCalledWith(undefined, expect.any(String), [
+      '--single-branch',
+      '--branch',
+      'main',
+      '--no-tags',
+    ])
+  })
+
+  it('should use --depth when MIRROR_CLONE_DEPTH is set', async () => {
+    const caller = t.createCallerFactory(reposRouter)(createTestContext())
+
+    process.env.MIRROR_CLONE_DEPTH = '1'
+
+    vi.spyOn(config, 'getConfig').mockResolvedValue({
+      publicOrg: 'github',
+      privateOrg: 'github-test',
+    })
+
+    om.mockFunctions.rest.apps.getOrgInstallation.mockResolvedValue(
+      fakeOrgInstallation,
+    )
+    om.mockFunctions.rest.orgs.get.mockResolvedValue(fakeOrg)
+    om.mockFunctions.rest.repos.get.mockResolvedValueOnce(repoNotFound)
+    om.mockFunctions.rest.repos.get.mockResolvedValueOnce(fakeForkRepo)
+    om.mockFunctions.rest.orgs.getAllCustomProperties.mockResolvedValue(
+      fakeOrgCustomProperties,
+    )
+    om.mockFunctions.rest.orgs.createOrUpdateCustomProperty.mockResolvedValue(
+      fakeOrgCustomProperties,
+    )
+    om.mockFunctions.rest.repos.createInOrg.mockResolvedValue(fakeMirrorRepo)
+
+    await caller.createMirror({
+      forkId: 'test',
+      orgId: 'test',
+      forkRepoName: 'fork-test',
+      forkRepoOwner: 'github',
+      newBranchName: 'test',
+      newRepoName: 'test',
+    })
+
+    expect(cloneSpy).toHaveBeenCalledWith(
+      undefined,
+      expect.any(String),
+      expect.arrayContaining(['--depth', '1']),
+    )
   })
 })

@@ -86,6 +86,8 @@ export const createMirrorHandler = async ({
       repo: input.forkRepoName,
     })
 
+    const defaultBranch = forkData.data.default_branch
+
     // Now create a temporary directory to clone the repo into
     const tempDir = temporaryDirectory()
 
@@ -105,7 +107,17 @@ export const createMirrorHandler = async ({
       input.forkRepoName,
     )
 
-    await git.clone(remote, tempDir)
+    const cloneConfig = [
+      '--single-branch',
+      '--branch',
+      defaultBranch,
+      '--no-tags',
+    ]
+    if (process.env.MIRROR_CLONE_DEPTH) {
+      cloneConfig.push('--depth', process.env.MIRROR_CLONE_DEPTH)
+    }
+
+    await git.clone(remote, tempDir, cloneConfig)
 
     // Get the organization custom properties
     const orgCustomProps =
@@ -139,8 +151,6 @@ export const createMirrorHandler = async ({
         fork: `${input.forkRepoOwner}/${input.forkRepoName}`,
       },
     })
-
-    const defaultBranch = forkData.data.default_branch
 
     // Add the mirror remote
     const upstreamRemote = generateAuthUrl(

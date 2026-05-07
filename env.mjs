@@ -54,6 +54,13 @@ export const env = createEnv({
       .optional()
       .default('false')
       .transform((value) => value === 'true'),
+    MIRROR_CLONE_DEPTH: z
+      .string()
+      .optional()
+      .refine(
+        (val) => !val || (Number.isInteger(Number(val)) && Number(val) > 0),
+        'MIRROR_CLONE_DEPTH must be a positive integer',
+      ),
   },
   /*
    * Environment variables available on the client (and server).
@@ -87,6 +94,7 @@ export const env = createEnv({
       process.env.CREATE_MIRRORS_WITH_INTERNAL_VISIBILITY,
     DELETE_INTERNAL_MERGE_COMMITS_ON_SYNC:
       process.env.DELETE_INTERNAL_MERGE_COMMITS_ON_SYNC,
+    MIRROR_CLONE_DEPTH: process.env.MIRROR_CLONE_DEPTH,
   },
   skipValidation: process.env.SKIP_ENV_VALIDATIONS === 'true',
 })
